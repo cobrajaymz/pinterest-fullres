@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Full-Res — pull originals from Pinterest links</title>
+<style>
+  :root{
+    --charcoal:#1B1B1D;
+    --paper:#F1EDE4;
+    --paper-dim:#E4DECC;
+    --film-red:#D6402B;
+    --grease:#F2B705;
+    --grey:#8B8B8D;
+    --ink:#232220;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--charcoal);
+    color:var(--paper);
+    font-family:'IBM Plex Sans', Arial, sans-serif;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    padding:48px 20px 80px;
+  }
+  @font-face{
+    font-family:'IBM Plex Mono';
+    src:local('IBM Plex Mono');
+  }
+  .wrap{
+    width:100%;
+    max-width:920px;
+  }
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color:var(--grey);
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:14px;
+  }
+  .eyebrow::before{
+    content:"";
+    width:8px;height:8px;border-radius:50%;
+    background:var(--film-red);
+    display:inline-block;
+  }
+  h1{
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:600;
+    font-size:clamp(28px,4vw,42px);
+    line-height:1.15;
+    margin:0 0 10px;
+    letter-spacing:-0.01em;
+  }
+  h1 span{color:var(--film-red);}
+  .sub{
+    color:var(--grey);
+    font-size:15px;
+    max-width:60ch;
+    line-height:1.55;
+    margin-bottom:36px;
+  }
+  .lighttable{
+    background:var(--paper);
+    color:var(--ink);
+    border-radius:4px;
+    padding:22px;
+    box-shadow:0 30px 60px -20px rgba(0,0,0,.6);
+  }
+  label.field-label{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--grey);
+    display:block;
+    margin-bottom:8px;
+  }
+  textarea{
+    width:100%;
+    min-height:110px;
+    resize:vertical;
+    border:1px solid #cfc8b3;
+    border-radius:2px;
+    background:#fff;
+    padding:12px 14px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13px;
+    color:var(--ink);
+    line-height:1.6;
+  }
+  textarea:focus{outline:2px solid var(--film-red); outline-offset:1px;}
+  .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:14px;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .hint{
+    font-size:12.5px;
+    color:var(--grey);
+    line-height:1.5;
+  }
+  button.run{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13px;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    background:var(--film-red);
+    color:#fff;
+    border:none;
+    padding:12px 22px;
+    border-radius:2px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  button.run:hover{background:#b93521;}
+  button.run:disabled{background:var(--grey); cursor:default;}
+
+  .status{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    color:var(--grey);
+    margin:18px 0 8px;
+    min-height:16px;
+  }
+
+  .sheet{
+    margin-top:18px;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+  .frame{
+    background:var(--paper);
+    color:var(--ink);
+    border-radius:4px;
+    padding:16px;
+    display:grid;
+    grid-template-columns:96px 1fr;
+    gap:16px;
+    align-items:center;
+  }
+  .frame.error{grid-template-columns:1fr;}
+  .thumb-wrap{
+    position:relative;
+    width:96px;
+    height:96px;
+    border:2px dashed #cfc8b3;
+    border-radius:3px;
+    overflow:hidden;
+    background:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .thumb-wrap img{
+    width:100%;height:100%;object-fit:cover;
+    display:block;
+  }
+  .ladder{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    color:var(--grey);
+    margin-bottom:8px;
+    flex-wrap:wrap;
+  }
+  .ladder .step{
+    padding:2px 6px;
+    border:1px solid #cfc8b3;
+    border-radius:10px;
+  }
+  .ladder .step.hit{
+    border-color:var(--film-red);
+    color:var(--film-red);
+  }
+  .ladder .arrow{color:#cfc8b3;}
+  .ladder .note{
+    font-style:italic;
+    color:var(--film-red);
+    margin-left:4px;
+  }
+  .ladder .step.final{
+    background:var(--grease);
+    border-color:var(--grease);
+    color:var(--ink);
+    font-weight:600;
+    position:relative;
+  }
+  .link-line{
+    display:flex;
+    gap:8px;
+    align-items:center;
+  }
+  .link-line input{
+    flex:1;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    padding:8px 10px;
+    border:1px solid #cfc8b3;
+    border-radius:2px;
+    background:#fff;
+    color:var(--ink);
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .copy-btn, .open-btn{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.05em;
+    border:1px solid var(--ink);
+    background:transparent;
+    color:var(--ink);
+    padding:8px 10px;
+    border-radius:2px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .copy-btn:hover, .open-btn:hover{background:var(--ink); color:var(--paper);}
+  .copy-btn.copied{background:var(--film-red); border-color:var(--film-red); color:#fff;}
+  .src{
+    font-size:11px;
+    color:var(--grey);
+    margin-top:6px;
+    word-break:break-all;
+  }
+  .reverse-row{
+    margin-top:12px;
+    padding-top:10px;
+    border-top:1px dashed #cfc8b3;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+  .reverse-label{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    text-transform:uppercase;
+    letter-spacing:.05em;
+    color:var(--grey);
+  }
+  .pill{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    text-decoration:none;
+    border:1px solid var(--grey);
+    color:var(--ink);
+    padding:5px 10px;
+    border-radius:14px;
+  }
+  .pill:hover{border-color:var(--ink); background:var(--ink); color:var(--paper);}
+  .error .msg{
+    font-size:13px;
+    color:var(--film-red);
+    font-family:'IBM Plex Mono', monospace;
+  }
+  .error .fix{
+    font-size:12.5px;
+    color:var(--grey);
+    margin-top:4px;
+  }
+  footer{
+    margin-top:30px;
+    font-size:12px;
+    color:var(--grey);
+    line-height:1.6;
+    max-width:60ch;
+  }
+  footer b{color:var(--paper);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">contact sheet / originals finder</div>
+  <h1>Pull the frame<br>before it got <span>cropped down.</span></h1>
+  <div class="sub">
+    Pinterest serves whatever size fits the grid — 236, 474, 736 pixels wide.
+    The original file is still sitting on their CDN. Paste image links or pin
+    links below, one per line, and this pulls the uncropped version.
+  </div>
+
+  <div class="lighttable">
+    <label class="field-label">Links (one per line)</label>
+    <textarea id="input" placeholder="https://i.pinimg.com/474x/ab/cd/ef/abcdef123.jpg
+https://www.pinterest.com/pin/123456789012345678/"></textarea>
+    <div class="row">
+      <div class="hint">Works best with direct <code>i.pinimg.com</code> image links.<br>Pin page links (<code>pinterest.com/pin/...</code>) are attempted via a lookup — not always reliable.</div>
+      <button class="run" id="runBtn">Find originals</button>
+    </div>
+  </div>
+
+  <div class="status" id="status"></div>
+  <div class="sheet" id="sheet"></div>
+
+  <footer>
+    <b>How this works:</b> Pinterest's CDN encodes size right in the URL path
+    (<code>/236x/</code>, <code>/474x/</code>, <code>/564x/</code>, <code>/736x/</code>). There's no
+    guarantee an <code>/originals/</code> file exists for a given pin, so instead of
+    assuming it does, this actually test-loads <code>originals</code>, <code>736x</code>,
+    <code>564x</code>, and <code>474x</code> as real images and keeps whichever one both
+    loads and comes back widest. If nothing bigger resolves, it says so and keeps
+    what you gave it. For pin page links, it fetches the public page and reads the
+    image tag out of it first, which can occasionally fail or get blocked; if so,
+    open the pin, click the image to expand it, right-click → <i>Copy image address</i>,
+    and paste that instead.
+    <br><br>
+    <b>Search elsewhere:</b> each result also links out to Google Lens, Yandex, and
+    TinEye's reverse-image search, seeded with the resolved Pinterest URL. Pinterest
+    is usually a re-post of an image originally hosted somewhere else — a
+    photographer's site, a stock library, a blog — and that original host often has
+    a bigger file than Pinterest ever stored. These open the search engines' own
+    results pages in a new tab; there's no automated scraping happening, since none
+    of these sites allow that from a page like this one — it's just a shortcut past
+    typing the URL in yourself.
+  </footer>
+</div>
+
+<script>
+const PROXY = "https://api.allorigins.win/raw?url=";
+
+function extractSizeSegment(url) {
+  // matches /236x/, /474x/, /564x/, /736x/, /236x146/, /originals/ etc.
+  const m = url.match(/\/(\d+x\d*|originals)\//);
+  return m ? m[1] : null;
+}
+
+function swapSize(url, seg, replacement) {
+  return url.replace("/" + seg + "/", "/" + replacement + "/");
+}
+
+// Load a candidate URL as a real <img> and report whether it resolves,
+// plus its actual pixel width — since Pinterest doesn't guarantee an
+// "originals" file exists, this is the only way to know for sure.
+function testImageLoads(url, timeoutMs = 6000) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    let settled = false;
+    const done = (ok, width) => {
+      if (settled) return;
+      settled = true;
+      resolve({ ok, width: width || 0, url });
+    };
+    img.onload = () => done(true, img.naturalWidth);
+    img.onerror = () => done(false, 0);
+    setTimeout(() => done(false, 0), timeoutMs);
+    img.referrerPolicy = "no-referrer";
+    img.src = url;
+  });
+}
+
+// Try candidate buckets biggest-first, keep the first one that actually
+// loads and is at least as large as what we started with. Falls back to
+// the original URL if nothing bigger resolves.
+async function findBestAvailable(url) {
+  const seg = extractSizeSegment(url);
+  if (!seg) return null;
+
+  const baseline = await testImageLoads(url);
+  const candidates = seg === "originals"
+    ? []
+    : ["originals", "736x", "564x", "474x"].filter(s => s !== seg);
+
+  let best = { seg, url, width: baseline.width, verified: baseline.ok };
+
+  for (const candSeg of candidates) {
+    const candUrl = swapSize(url, seg, candSeg);
+    const result = await testImageLoads(candUrl);
+    if (result.ok && result.width > best.width) {
+      best = { seg: candSeg, url: candUrl, width: result.width, verified: true };
+      if (candSeg === "originals") break; // can't do better than this
+    }
+  }
+  return best;
+}
+
+function isPinimg(url) {
+  return /https?:\/\/i\.pinimg\.com\//.test(url);
+}
+
+function isPinPage(url) {
+  return /pinterest\.[a-z.]+\/pin\//i.test(url);
+}
+
+async function resolvePinPage(pinUrl) {
+  const res = await fetch(PROXY + encodeURIComponent(pinUrl));
+  if (!res.ok) throw new Error("lookup failed (" + res.status + ")");
+  const html = await res.text();
+  const og = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+          || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+  if (!og) throw new Error("no image tag found on that page");
+  return og[1];
+}
+
+function sizeLadderHTML(currentSize, hitOriginals) {
+  const sizes = ["60x60","236x","474x","564x","736x","originals"];
+  return sizes.map((s,i) => {
+    const isFinal = s === "originals";
+    const isCurrent = s === currentSize;
+    let cls = "step";
+    if (isCurrent && isFinal) cls += " final";
+    else if (isCurrent) cls += " hit";
+    const label = isFinal ? "originals" : s.replace("x","px");
+    return (i>0 ? '<span class="arrow">→</span>' : '') + '<span class="'+cls+'">'+label+'</span>';
+  }).join("") + (!hitOriginals ? ' <span class="note">no larger file found — kept best available</span>' : '');
+}
+
+function reverseSearchLinks(url) {
+  const enc = encodeURIComponent(url);
+  return `
+    <div class="reverse-row">
+      <span class="reverse-label">Search elsewhere for a bigger original:</span>
+      <a class="pill" href="https://lens.google.com/uploadbyurl?url=${enc}" target="_blank" rel="noopener">Google Lens</a>
+      <a class="pill" href="https://yandex.com/images/search?rpt=imageview&url=${enc}" target="_blank" rel="noopener">Yandex</a>
+      <a class="pill" href="https://tineye.com/search?url=${enc}" target="_blank" rel="noopener">TinEye</a>
+    </div>
+  `;
+}
+
+function buildFrame({thumb, finalUrl, foundSize, width, sourceLine}) {
+  const div = document.createElement("div");
+  div.className = "frame";
+  const hitOriginals = foundSize === "originals";
+  div.innerHTML = `
+    <div class="thumb-wrap">
+      <img src="${thumb || finalUrl}" loading="lazy" onerror="this.parentElement.innerHTML='<span style=\\'font-family:monospace;font-size:10px;color:#8B8B8D\\'>no preview</span>'">
+    </div>
+    <div>
+      <div class="ladder">${sizeLadderHTML(foundSize, hitOriginals)}</div>
+      <div class="link-line">
+        <input type="text" readonly value="${finalUrl}">
+        <button class="copy-btn">Copy</button>
+        <a class="open-btn" href="${finalUrl}" target="_blank" rel="noopener">Open</a>
+      </div>
+      <div class="src">${width ? width + "px wide, verified — " : ""}from: ${sourceLine}</div>
+      ${reverseSearchLinks(finalUrl)}
+    </div>
+  `;
+  const copyBtn = div.querySelector(".copy-btn");
+  copyBtn.addEventListener("click", () => {
+    navigator.clipboard.writeText(finalUrl).then(() => {
+      copyBtn.textContent = "Copied";
+      copyBtn.classList.add("copied");
+      setTimeout(() => { copyBtn.textContent = "Copy"; copyBtn.classList.remove("copied"); }, 1400);
+    });
+  });
+  return div;
+}
+
+function buildErrorFrame(line, message, fix) {
+  const div = document.createElement("div");
+  div.className = "frame error";
+  div.innerHTML = `
+    <div>
+      <div class="msg">Couldn't resolve: ${line}</div>
+      <div class="fix">${message}${fix ? " — " + fix : ""}</div>
+    </div>
+  `;
+  return div;
+}
+
+async function processLine(line) {
+  line = line.trim();
+  if (!line) return null;
+
+  if (isPinimg(line)) {
+    const best = await findBestAvailable(line);
+    if (!best) {
+      return { error: true, line, message: "Didn't recognize a size segment in this URL." };
+    }
+    return { thumb: line, finalUrl: best.url, foundSize: best.seg, width: best.width, sourceLine: line };
+  }
+
+  if (isPinPage(line)) {
+    try {
+      const img = await resolvePinPage(line);
+      const best = await findBestAvailable(img);
+      if (!best) {
+        return { thumb: img, finalUrl: img, foundSize: null, sourceLine: line };
+      }
+      return { thumb: img, finalUrl: best.url, foundSize: best.seg, width: best.width, sourceLine: line };
+    } catch (e) {
+      return { error: true, line, message: e.message, fix: "try pasting the direct image link instead" };
+    }
+  }
+
+  return { error: true, line, message: "Not a Pinterest image or pin link.", fix: "expects i.pinimg.com or pinterest.com/pin/..." };
+}
+
+document.getElementById("runBtn").addEventListener("click", async () => {
+  const raw = document.getElementById("input").value;
+  const lines = raw.split("\n").map(l => l.trim()).filter(Boolean);
+  const sheet = document.getElementById("sheet");
+  const status = document.getElementById("status");
+  const btn = document.getElementById("runBtn");
+  sheet.innerHTML = "";
+  if (!lines.length) {
+    status.textContent = "Paste at least one link first.";
+    return;
+  }
+  btn.disabled = true;
+  for (let i = 0; i < lines.length; i++) {
+    status.textContent = `Resolving ${i+1} of ${lines.length}…`;
+    const result = await processLine(lines[i]);
+    if (!result) continue;
+    if (result.error) {
+      sheet.appendChild(buildErrorFrame(result.line, result.message, result.fix));
+    } else {
+      sheet.appendChild(buildFrame(result));
+    }
+  }
+  status.textContent = `Done — ${lines.length} link${lines.length > 1 ? "s" : ""} processed.`;
+  btn.disabled = false;
+});
+</script>
+</body>
+</html>
